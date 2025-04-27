@@ -5,33 +5,34 @@
 @Author: Macan (ma_cancan@163.com) 
 """
 
-import tensorflow as tf
-import numpy as np
 import codecs
-import pickle
 import os
+import pickle
 from datetime import datetime
 
-from bert_base.train.models import create_model, InputFeatures
+import numpy as np
+import tensorflow as tf
+
 from bert_base.bert import tokenization, modeling
+from bert_base.train.models import create_model, InputFeatures
 from bert_base.train.train_helper import get_args_parser
+
 args = get_args_parser()
 
-model_dir = r'C:\Users\C\Documents\Tencent Files\389631699\FileRecv\semi_corpus_people_2014'
-bert_dir = 'F:\chinese_L-12_H-768_A-12'
+model_dir = 'output'
+bert_dir = 'chinese_L-12_H-768_A-12'
 
-is_training=False
-use_one_hot_embeddings=False
-batch_size=1
+is_training = False
+use_one_hot_embeddings = False
+batch_size = 1
 
 gpu_config = tf.ConfigProto()
 gpu_config.gpu_options.allow_growth = True
-sess=tf.Session(config=gpu_config)
-model=None
+sess = tf.compat.v1.Session(config=gpu_config)
+model = None
 
 global graph
 input_ids_p, input_mask_p, label_ids_p, segment_ids_p = None, None, None, None
-
 
 print('checkpoint path:{}'.format(os.path.join(model_dir, "checkpoint")))
 if not os.path.exists(os.path.join(model_dir, "checkpoint")):
@@ -46,24 +47,29 @@ with codecs.open(os.path.join(model_dir, 'label_list.pkl'), 'rb') as rf:
     label_list = pickle.load(rf)
 num_labels = len(label_list) + 1
 
-graph = tf.get_default_graph()
+graph = tf.compat.v1.get_default_graph()
 with graph.as_default():
     print("going to restore checkpoint")
-    #sess.run(tf.global_variables_initializer())
-    input_ids_p = tf.placeholder(tf.int32, [batch_size, args.max_seq_length], name="input_ids")
-    input_mask_p = tf.placeholder(tf.int32, [batch_size, args.max_seq_length], name="input_mask")
+    # sess.run(tf.global_variables_initializer())
+    input_ids_p = tf.compat.v1.placeholder(tf.int32, [batch_size, args.max_seq_length], name="input_ids")
+    input_mask_p = tf.compat.v1.placeholder(tf.int32, [batch_size, args.max_seq_length], name="input_mask")
 
     bert_config = modeling.BertConfig.from_json_file(os.path.join(bert_dir, 'bert_config.json'))
-    (total_loss, logits, trans, pred_ids) = create_model(
-        bert_config=bert_config, is_training=False, input_ids=input_ids_p, input_mask=input_mask_p, segment_ids=None,
-        labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0)
+    (total_loss, logits, trans, pred_ids) = create_model(bert_config=bert_config,
+                                                         is_training=False,
+                                                         input_ids=input_ids_p,
+                                                         input_mask=input_mask_p,
+                                                         segment_ids=None,
+                                                         labels=None,
+                                                         num_labels=num_labels,
+                                                         use_one_hot_embeddings=False,
+                                                         dropout_rate=1.0)
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
     saver.restore(sess, tf.train.latest_checkpoint(model_dir))
 
-
-tokenizer = tokenization.FullTokenizer(
-        vocab_file=os.path.join(bert_dir, 'vocab.txt'), do_lower_case=args.do_lower_case)
+tokenizer = tokenization.FullTokenizer(vocab_file=os.path.join(bert_dir, 'vocab.txt'),
+                                       do_lower_case=args.do_lower_case)
 
 
 def predict_online():
@@ -74,12 +80,13 @@ def predict_online():
     :param line: a list. element is: [dummy_label,text_a,text_b]
     :return:
     """
+
     def convert(line):
         feature = convert_single_example(0, line, label_list, args.max_seq_length, tokenizer, 'p')
-        input_ids = np.reshape([feature.input_ids],(batch_size, args.max_seq_length))
-        input_mask = np.reshape([feature.input_mask],(batch_size, args.max_seq_length))
-        segment_ids = np.reshape([feature.segment_ids],(batch_size, args.max_seq_length))
-        label_ids =np.reshape([feature.label_ids],(batch_size, args.max_seq_length))
+        input_ids = np.reshape([feature.input_ids], (batch_size, args.max_seq_length))
+        input_mask = np.reshape([feature.input_mask], (batch_size, args.max_seq_length))
+        segment_ids = np.reshape([feature.segment_ids], (batch_size, args.max_seq_length))
+        label_ids = np.reshape([feature.label_ids], (batch_size, args.max_seq_length))
         return input_ids, input_mask, segment_ids, label_ids
 
     global graph
@@ -102,9 +109,10 @@ def predict_online():
             pred_ids_result = sess.run([pred_ids], feed_dict)
             pred_label_result = convert_id_to_label(pred_ids_result, id2label)
             print(pred_label_result)
-            #todo: 组合策略
+            # todo: 组合策略
             result = strage_combined_link_org_loc(sentence, pred_label_result[0])
             print('time used: {} sec'.format((datetime.now() - start).total_seconds()))
+
 
 def convert_id_to_label(pred_ids_result, idx2label):
     """
@@ -127,7 +135,6 @@ def convert_id_to_label(pred_ids_result, idx2label):
     return result
 
 
-
 def strage_combined_link_org_loc(tokens, tags):
     """
     组合策略
@@ -135,6 +142,7 @@ def strage_combined_link_org_loc(tokens, tags):
     :param types:
     :return:
     """
+
     def print_output(data, type):
         line = []
         line.append(type)
@@ -233,12 +241,15 @@ class Pair(object):
     @property
     def start(self):
         return self.__start
+
     @property
     def end(self):
         return self.__end
+
     @property
     def merge(self):
         return self.__merge
+
     @property
     def word(self):
         return self.__word
@@ -246,15 +257,19 @@ class Pair(object):
     @property
     def types(self):
         return self.__types
+
     @word.setter
     def word(self, word):
         self.__word = word
+
     @start.setter
     def start(self, start):
         self.__start = start
+
     @end.setter
     def end(self, end):
         self.__end = end
+
     @merge.setter
     def merge(self, merge):
         self.__merge = merge
@@ -280,6 +295,7 @@ class Result(object):
         self.loc = []
         self.org = []
         self.others = []
+
     def get_result(self, tokens, tags, config=None):
         # 先获取标注结果
         self.result_to_json(tokens, tags)
@@ -300,12 +316,13 @@ class Result(object):
 
         for char, tag in zip(string, tags):
             if tag[0] == "S":
-                self.append(char, idx, idx+1, tag[2:])
-                item["entities"].append({"word": char, "start": idx, "end": idx+1, "type":tag[2:]})
+                self.append(char, idx, idx + 1, tag[2:])
+                item["entities"].append({"word": char, "start": idx, "end": idx + 1, "type": tag[2:]})
             elif tag[0] == "B":
                 if entity_name != '':
                     self.append(entity_name, entity_start, idx, last_tag[2:])
-                    item["entities"].append({"word": entity_name, "start": entity_start, "end": idx, "type": last_tag[2:]})
+                    item["entities"].append(
+                        {"word": entity_name, "start": entity_start, "end": idx, "type": last_tag[2:]})
                     entity_name = ""
                 entity_name += char
                 entity_start = idx
@@ -314,7 +331,8 @@ class Result(object):
             elif tag[0] == "O":
                 if entity_name != '':
                     self.append(entity_name, entity_start, idx, last_tag[2:])
-                    item["entities"].append({"word": entity_name, "start": entity_start, "end": idx, "type": last_tag[2:]})
+                    item["entities"].append(
+                        {"word": entity_name, "start": entity_start, "end": idx, "type": last_tag[2:]})
                     entity_name = ""
             else:
                 entity_name = ""
@@ -339,4 +357,3 @@ class Result(object):
 
 if __name__ == "__main__":
     predict_online()
-

@@ -7,10 +7,10 @@
 @Author: Macan
 """
 
-
 import os
 import codecs
 import argparse
+
 
 def load_file(file_path):
     if not os.path.exists(file_path):
@@ -30,7 +30,7 @@ def _cut(sentence):
             sen = []
             continue
         sen.append(i)
-    if len(new_sentence) == 1: #娄底那种一句话超过max_seq_length的且没有句号的，用,分割，再长的不考虑了。。。
+    if len(new_sentence) == 1:  # 娄底那种一句话超过max_seq_length的且没有句号的，用,分割，再长的不考虑了。。。
         new_sentence = []
         sen = []
         for i in sentence:
@@ -68,6 +68,7 @@ def cut_sentence(file, max_seq_length):
         sentence.append(line)
     print('token cnt:{}'.format(cnt))
     return context
+
 
 def write_to_file(file, context):
     # 首先将源文件改名为新文件名，避免覆盖

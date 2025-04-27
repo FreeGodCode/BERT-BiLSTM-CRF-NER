@@ -8,12 +8,12 @@
  some code come from <https://hanxiao.github.io>
 """
 
+import pickle
 import sys
 import threading
 import time
 import uuid
 import warnings
-import pickle
 from collections import namedtuple
 
 import numpy as np
@@ -35,10 +35,8 @@ Response = namedtuple('Response', ['id', 'content'])
 
 
 class BertClient(object):
-    def __init__(self, ip='localhost', port=5555, port_out=5556,
-                 output_fmt='ndarray', show_server_config=False,
-                 identity=None, check_version=True, check_length=True,
-                 timeout=-1, mode='NER', ner_model_dir=None):
+    def __init__(self, ip='localhost', port=5555, port_out=5556, output_fmt='ndarray', show_server_config=False,
+                 identity=None, check_version=True, check_length=True, timeout=-1, mode='NER', ner_model_dir=None):
         """ A client object connected to a BertServer
 
         Create a BertClient that connects to a BertServer.
@@ -92,7 +90,7 @@ class BertClient(object):
         self.timeout = timeout
         self.pending_request = set()
         if type(mode) != str:
-            raise ArithmeticError('mode params should be str type, but input mode type is :%s' %type(mode))
+            raise ArithmeticError('mode params should be str type, but input mode type is :%s' % type(mode))
         else:
             self.mode = mode
 

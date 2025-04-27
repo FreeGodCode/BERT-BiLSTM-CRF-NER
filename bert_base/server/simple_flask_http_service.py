@@ -11,42 +11,46 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import flask
-from flask import request, jsonify
 import json
+import os
 import pickle
-from datetime import datetime
-import tensorflow as tf
-from tensorflow import keras as K
-import numpy as np
-
 import sys
-sys.path.append('../..')
+from datetime import datetime
+
+import flask
+import numpy as np
+import tensorflow as tf
+from flask import request
+
 from bert_base.train.models import create_model, InputFeatures
 from bert_base.bert import tokenization, modeling
 
+sys.path.append('../..')
 
 model_dir = r'../../output'
-bert_dir = 'H:\models\chinese_L-12_H-768_A-12'
+bert_dir = 'chinese_L-12_H-768_A-12'
 
-is_training=False
-use_one_hot_embeddings=False
-batch_size=1
-max_seq_length = 202
-
-gpu_config = tf.ConfigProto()
+is_training = False
+use_one_hot_embeddings = False
+batch_size = 1
+max_seq_length = 128
+gpu_config = tf.compat.v1.ConfigProto()
+# 使用gpu时，tensorflow运行自动慢慢达到最大gpu的内存
 gpu_config.gpu_options.allow_growth = True
-sess=tf.Session(config=gpu_config)
-model=None
+# 使用GPU时，设置gpu内存使用的最大比例
+gpu_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+# 能够使用gpu
+tf.test.is_built_with_cuda()
 
-global graph
+sess = tf.compat.v1.Session(config=gpu_config)
+model = None
+
+# global graph
 input_ids_p, input_mask_p, label_ids_p, segment_ids_p = None, None, None, None
 
-
-print('checkpoint path:{}'.format(os.path.join(model_dir, "checkpoint")))
-if not os.path.exists(os.path.join(model_dir, "checkpoint")):
-    raise Exception("failed to get checkpoint. going to return ")
+# print('checkpoint path:{}'.format(os.path.join(model_dir, "checkpoint")))
+# if not os.path.exists(os.path.join(model_dir, "checkpoint")):
+#     raise Exception("failed to get checkpoint. going to return ")
 
 # 加载label->id的词典
 with open(os.path.join(model_dir, 'label2id.pkl'), 'rb') as rf:
@@ -57,24 +61,28 @@ with open(os.path.join(model_dir, 'label_list.pkl'), 'rb') as rf:
     label_list = pickle.load(rf)
 num_labels = len(label_list) + 1
 
-
-graph = tf.get_default_graph()
+graph = tf.compat.v1.get_default_graph()
 with graph.as_default():
     print("going to restore checkpoint")
-    #sess.run(tf.global_variables_initializer())
-    input_ids_p = tf.placeholder(tf.int32, [batch_size, max_seq_length], name="input_ids")
-    input_mask_p = tf.placeholder(tf.int32, [batch_size, max_seq_length], name="input_mask")
+    sess.run(tf.compat.v1.global_variables_initializer())
+    input_ids_p = tf.compat.v1.placeholder(tf.int32, [batch_size, max_seq_length], name="input_ids")
+    input_mask_p = tf.compat.v1.placeholder(tf.int32, [batch_size, max_seq_length], name="input_mask")
 
     bert_config = modeling.BertConfig.from_json_file(os.path.join(bert_dir, 'bert_config.json'))
-    (total_loss, logits, trans, pred_ids) = create_model(
-        bert_config=bert_config, is_training=False, input_ids=input_ids_p, input_mask=input_mask_p, segment_ids=None,
-        labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0)
+    (total_loss, logits, trans, pred_ids) = create_model(bert_config=bert_config,
+                                                         is_training=False,
+                                                         input_ids=input_ids_p,
+                                                         input_mask=input_mask_p,
+                                                         segment_ids=None,
+                                                         labels=None,
+                                                         num_labels=num_labels,
+                                                         use_one_hot_embeddings=False,
+                                                         dropout_rate=1.0)
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
     saver.restore(sess, tf.train.latest_checkpoint(model_dir))
 
-tokenizer = tokenization.FullTokenizer(
-        vocab_file=os.path.join(bert_dir, 'vocab.txt'), do_lower_case=True)
+tokenizer = tokenization.FullTokenizer(vocab_file=os.path.join(bert_dir, 'vocab.txt'), do_lower_case=True)
 
 app = flask.Flask(__name__)
 
@@ -88,12 +96,13 @@ def ner_predict_service():
     :param line: a list. element is: [dummy_label,text_a,text_b]
     :return:
     """
+
     def convert(line):
         feature = convert_single_example(0, line, label_list, max_seq_length, tokenizer, 'p')
-        input_ids = np.reshape([feature.input_ids],(batch_size, max_seq_length))
-        input_mask = np.reshape([feature.input_mask],(batch_size, max_seq_length))
-        segment_ids = np.reshape([feature.segment_ids],(batch_size, max_seq_length))
-        label_ids =np.reshape([feature.label_ids],(batch_size, max_seq_length))
+        input_ids = np.reshape([feature.input_ids], (batch_size, max_seq_length))
+        input_mask = np.reshape([feature.input_mask], (batch_size, max_seq_length))
+        segment_ids = np.reshape([feature.segment_ids], (batch_size, max_seq_length))
+        label_ids = np.reshape([feature.label_ids], (batch_size, max_seq_length))
         return input_ids, input_mask, segment_ids, label_ids
 
     global graph
@@ -104,14 +113,13 @@ def ner_predict_service():
             sentence = request.args['query']
             result['query'] = sentence
             start = datetime.now()
-            if len(sentence) < 2:
-                print(sentence)
-                result['data'] = ['O'] * len(sentence)
-                return json.dumps(result)
+            # if len(sentence) < 2:
+            #     print(sentence)
+            #     result['data'] = ['O'] * len(sentence)
+            #     return json.dumps(result)
             sentence = tokenizer.tokenize(sentence)
             # print('your input is:{}'.format(sentence))
             input_ids, input_mask, segment_ids, label_ids = convert(sentence)
-
 
             feed_dict = {input_ids_p: input_ids,
                          input_mask_p: input_mask}
@@ -119,7 +127,7 @@ def ner_predict_service():
             pred_ids_result = sess.run([pred_ids], feed_dict)
             pred_label_result = convert_id_to_label(pred_ids_result, id2label)
             print(pred_label_result)
-            #todo: 组合策略
+            # todo: 组合策略
             result['data'] = pred_label_result
             print('time used: {} sec'.format((datetime.now() - start).total_seconds()))
             return json.dumps(result)
@@ -127,6 +135,7 @@ def ner_predict_service():
             result['code'] = -1
             result['data'] = 'error'
             return json.dumps(result)
+
 
 def online_predict():
     """
@@ -136,27 +145,26 @@ def online_predict():
     :param line: a list. element is: [dummy_label,text_a,text_b]
     :return:
     """
+
     def convert(line):
         feature = convert_single_example(0, line, label_list, max_seq_length, tokenizer, 'p')
-        input_ids = np.reshape([feature.input_ids],(batch_size, max_seq_length))
-        input_mask = np.reshape([feature.input_mask],(batch_size, max_seq_length))
-        segment_ids = np.reshape([feature.segment_ids],(batch_size, max_seq_length))
-        label_ids =np.reshape([feature.label_ids],(batch_size, max_seq_length))
+        input_ids = np.reshape([feature.input_ids], (batch_size, max_seq_length))
+        input_mask = np.reshape([feature.input_mask], (batch_size, max_seq_length))
+        segment_ids = np.reshape([feature.segment_ids], (batch_size, max_seq_length))
+        label_ids = np.reshape([feature.label_ids], (batch_size, max_seq_length))
         return input_ids, input_mask, segment_ids, label_ids
 
     global graph
     with graph.as_default():
-
         sentence = '北京天安门'
 
         start = datetime.now()
-        if len(sentence) < 2:
-            print(sentence)
+        # if len(sentence) < 2:
+        #     print(sentence)
 
         sentence = tokenizer.tokenize(sentence)
         # print('your input is:{}'.format(sentence))
         input_ids, input_mask, segment_ids, label_ids = convert(sentence)
-
 
         feed_dict = {input_ids_p: input_ids,
                      input_mask_p: input_mask}
@@ -164,11 +172,7 @@ def online_predict():
         pred_ids_result = sess.run([pred_ids], feed_dict)
         pred_label_result = convert_id_to_label(pred_ids_result, id2label)
         print(pred_label_result)
-
-        print('time used: {} sec'.format((datetime.now() - start).total_seconds()))
-
-
-
+        # print(f'time used: {(datetime.now() - start).total_seconds()} sec')
 
 
 def convert_id_to_label(pred_ids_result, idx2label):
@@ -264,6 +268,4 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=12345)
-    #online_predict()
-
-
+    online_predict()

@@ -1,13 +1,13 @@
 import contextlib
 import json
 import os
+import sys
 from enum import Enum
 
 from termcolor import colored
 
 from .helper import import_tf, set_logger
 
-import sys
 sys.path.append('..')
 from bert_base.bert import modeling
 
@@ -59,15 +59,15 @@ def optimize_bert_graph(args, logger=None):
         logger.info('model config: %s' % config_fp)
         logger.info(
             'checkpoint%s: %s' % (
-            ' (override by the fine-tuned model)' if args.tuned_model_dir else '', init_checkpoint))
-        with tf.gfile.GFile(config_fp, 'r') as f:
+                ' (override by the fine-tuned model)' if args.tuned_model_dir else '', init_checkpoint))
+        with tf.io.gfile.GFile(config_fp, 'r') as f:
             bert_config = modeling.BertConfig.from_dict(json.load(f))
 
         logger.info('build graph...')
         # input placeholders, not sure if they are friendly to XLA
-        input_ids = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_ids')
-        input_mask = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_mask')
-        input_type_ids = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_type_ids')
+        input_ids = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_ids')
+        input_mask = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_mask')
+        input_type_ids = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_type_ids')
 
         jit_scope = tf.contrib.compiler.jit.experimental_jit_scope if args.xla else contextlib.suppress
 
@@ -134,7 +134,7 @@ def optimize_bert_graph(args, logger=None):
         with tf.Session(config=config) as sess:
             logger.info('load parameters from checkpoint...')
 
-            sess.run(tf.global_variables_initializer())
+            sess.run(tf.compat.v1.global_variables_initializer())
             dtypes = [n.dtype for n in input_tensors]
             logger.info('optimize...')
             tmp_g = optimize_for_inference(
@@ -149,7 +149,7 @@ def optimize_bert_graph(args, logger=None):
                                                    use_fp16=args.fp16)
 
         logger.info('write graph to a tmp file: %s' % args.model_pb_dir)
-        with tf.gfile.GFile(pb_file, 'wb') as f:
+        with tf.io.gfile.GFile(pb_file, 'wb') as f:
             f.write(tmp_g.SerializeToString())
     except Exception:
         logger.error('fail to optimize the graph!', exc_info=True)
@@ -250,7 +250,7 @@ def convert_variables_to_constants(sess,
     return output_graph_def
 
 
-def optimize_ner_model(args, num_labels,  logger=None):
+def optimize_ner_model(args, num_labels, logger=None):
     """
     加载中文NER模型
     :param args:
@@ -278,20 +278,22 @@ def optimize_ner_model(args, num_labels,  logger=None):
 
         graph = tf.Graph()
         with graph.as_default():
-            with tf.Session() as sess:
-                input_ids = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_ids')
-                input_mask = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_mask')
+            with tf.compat.v1.Session() as sess:
+                input_ids = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_ids')
+                input_mask = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_mask')
 
                 bert_config = modeling.BertConfig.from_json_file(os.path.join(args.bert_model_dir, 'bert_config.json'))
                 from bert_base.train.models import create_model
                 (total_loss, logits, trans, pred_ids) = create_model(
-                    bert_config=bert_config, is_training=False, input_ids=input_ids, input_mask=input_mask, segment_ids=None,
-                    labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0, lstm_size=args.lstm_size)
+                    bert_config=bert_config, is_training=False, input_ids=input_ids, input_mask=input_mask,
+                    segment_ids=None,
+                    labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0,
+                    lstm_size=args.lstm_size)
                 pred_ids = tf.identity(pred_ids, 'pred_ids')
-                saver = tf.train.Saver()
+                saver = tf.compat.v1.train.Saver()
 
-            with tf.Session() as sess:
-                sess.run(tf.global_variables_initializer())
+            with tf.compat.v1.Session() as sess:
+                sess.run(tf.compat.v1.global_variables_initializer())
                 saver.restore(sess, tf.train.latest_checkpoint(args.model_dir))
                 logger.info('freeze...')
                 from tensorflow.python.framework import graph_util
@@ -299,14 +301,14 @@ def optimize_ner_model(args, num_labels,  logger=None):
                 logger.info('model cut finished !!!')
         # 存储二进制模型到文件中
         logger.info('write graph to a tmp file: %s' % pb_file)
-        with tf.gfile.GFile(pb_file, 'wb') as f:
+        with tf.io.gfile.GFile(pb_file, 'wb') as f:
             f.write(tmp_g.SerializeToString())
         return pb_file
     except Exception as e:
         logger.error('fail to optimize the graph! %s' % e, exc_info=True)
 
 
-def optimize_class_model(args, num_labels,  logger=None):
+def optimize_class_model(args, num_labels, logger=None):
     """
     加载中文分类模型
     :param args:
@@ -333,24 +335,30 @@ def optimize_class_model(args, num_labels,  logger=None):
 
         graph = tf.Graph()
         with graph.as_default():
-            with tf.Session() as sess:
-                input_ids = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_ids')
-                input_mask = tf.placeholder(tf.int32, (None, args.max_seq_len), 'input_mask')
+            with tf.compat.v1.Session() as sess:
+                input_ids = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_ids')
+                input_mask = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'input_mask')
 
                 bert_config = modeling.BertConfig.from_json_file(os.path.join(args.bert_model_dir, 'bert_config.json'))
                 from bert_base.train.models import create_classification_model
-                #为了兼容多输入，增加segment_id特征，即训练代码中的input_type_ids特征。
-                #loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config, is_training=False,
-                    #input_ids=input_ids, input_mask=input_mask, segment_ids=None, labels=None, num_labels=num_labels)
-                segment_ids = tf.placeholder(tf.int32, (None, args.max_seq_len), 'segment_ids')
-                loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config, is_training=False, input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids, labels=None, num_labels=num_labels)
+                # 为了兼容多输入，增加segment_id特征，即训练代码中的input_type_ids特征。
+                # loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config, is_training=False,
+                # input_ids=input_ids, input_mask=input_mask, segment_ids=None, labels=None, num_labels=num_labels)
+                segment_ids = tf.compat.v1.placeholder(tf.int32, (None, args.max_seq_len), 'segment_ids')
+                loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config,
+                                                                                            is_training=False,
+                                                                                            input_ids=input_ids,
+                                                                                            input_mask=input_mask,
+                                                                                            segment_ids=segment_ids,
+                                                                                            labels=None,
+                                                                                            num_labels=num_labels)
                 # pred_ids = tf.argmax(probabilities, axis=-1, output_type=tf.int32, name='pred_ids')
                 # pred_ids = tf.identity(pred_ids, 'pred_ids')
                 probabilities = tf.identity(probabilities, 'pred_prob')
-                saver = tf.train.Saver()
+                saver = tf.compat.v1.train.Saver()
 
-            with tf.Session() as sess:
-                sess.run(tf.global_variables_initializer())
+            with tf.compat.v1.Session() as sess:
+                sess.run(tf.compat.v1.global_variables_initializer())
                 saver.restore(sess, tf.train.latest_checkpoint(args.model_dir))
                 logger.info('freeze...')
                 from tensorflow.python.framework import graph_util
@@ -358,11 +366,8 @@ def optimize_class_model(args, num_labels,  logger=None):
                 logger.info('predict cut finished !!!')
         # 存储二进制模型到文件中
         logger.info('write graph to a tmp file: %s' % pb_file)
-        with tf.gfile.GFile(pb_file, 'wb') as f:
+        with tf.io.gfile.GFile(pb_file, 'wb') as f:
             f.write(tmp_g.SerializeToString())
         return pb_file
     except Exception as e:
         logger.error('fail to optimize the graph! %s' % e, exc_info=True)
-
-
-

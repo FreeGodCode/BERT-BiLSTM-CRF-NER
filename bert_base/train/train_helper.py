@@ -12,15 +12,16 @@ import os
 
 __all__ = ['get_args_parser']
 
+
 def get_args_parser():
     from .bert_lstm_ner import __version__
     parser = argparse.ArgumentParser()
     if os.name == 'nt':
-        bert_path = 'F:\chinese_L-12_H-768_A-12'
-        root_path = r'C:\workspace\python\BERT-BiLSTM-CRF-NER'
+        bert_path = r'/Users/ty/PycharmProjects/bert/chinese_L-12_H-768_A-12/'
+        root_path = r'/Users/ty/PycharmProjects/BERT-BiLSTM-CRF-NER'
     else:
-        bert_path = '/home/macan/ml/data/chinese_L-12_H-768_A-12/'
-        root_path = '/home/macan/ml/workspace/BERT-BiLSTM-CRF-NER'
+        bert_path = '/Users/ty/PycharmProjects/bert/chinese_L-12_H-768_A-12/'
+        root_path = '/Users/ty/PycharmProjects/BERT-BiLSTM-CRF-NER'
 
     group1 = parser.add_argument_group('File Paths',
                                        'config the path, checkpoint and filename of a pretrained/fine-tuned BERT model')

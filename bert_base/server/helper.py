@@ -1,9 +1,10 @@
 import argparse
 import logging
 import os
+import pickle
 import sys
 import uuid
-import pickle
+
 import zmq
 from zmq.utils import jsonapi
 
@@ -12,14 +13,14 @@ __all__ = ['set_logger', 'send_ndarray', 'get_args_parser',
 
 
 def set_logger(context, verbose=False):
-    #if os.name == 'nt':  # for Windows
+    # if os.name == 'nt':  # for Windows
     #    return NTLogger(context, verbose)
 
     logger = logging.getLogger(context)
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     formatter = logging.Formatter(
-        '%(levelname)-.1s:' + context + ':[%(filename).3s:%(funcName).3s:%(lineno)3d]:%(message)s', datefmt=
-        '%m-%d %H:%M:%S')
+        '%(levelname)-.1s:' + context + ':[%(filename).3s:%(funcName).3s:%(lineno)3d]:%(message)s',
+        datefmt='%m-%d %H:%M:%S')
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
     console_handler.setFormatter(formatter)
@@ -50,9 +51,9 @@ class NTLogger:
 def send_ndarray(src, dest, X, req_id=b'', flags=0, copy=True, track=False):
     """send a numpy array with metadata"""
     # md = dict(dtype=str(X.dtype), shape=X.shape)
-    if type(X) == list and type(X[0]) == dict: # 分类for sink发送消息的处理
+    if type(X) == list and type(X[0]) == dict:  # 分类for sink发送消息的处理
         md = dict(dtype='json', shape=(len(X[0]['pred_label']), 1))
-    elif type(X) == dict: # 分类 bertwork 发送消息的处理
+    elif type(X) == dict:  # 分类 bertwork 发送消息的处理
         md = dict(dtype='json', shape=(len(X['pred_label']), 1))
     else:
         md = dict(dtype='str', shape=(len(X), len(X[0])))
@@ -159,7 +160,7 @@ def import_tf(device_id=-1, verbose=False, use_fp16=False):
     os.environ['TF_FP16_MATMUL_USE_FP32_COMPUTE'] = '0' if use_fp16 else '1'
     os.environ['TF_FP16_CONV_USE_FP32_COMPUTE'] = '0' if use_fp16 else '1'
     import tensorflow as tf
-    tf.logging.set_verbosity(tf.logging.DEBUG if verbose else tf.logging.ERROR)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.DEBUG if verbose else tf.compat.v1.logging.ERROR)
     return tf
 
 

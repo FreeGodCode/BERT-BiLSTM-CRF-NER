@@ -9,14 +9,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import codecs
 import collections
 import os
-import codecs
 import pickle
+
 import numpy as np
 import tensorflow as tf
 
-import sys
 # sys.path.append('..')
 # from bert_base.server.helper import get_logger
 from bert_base.bert import modeling
@@ -32,11 +32,11 @@ else:
     bert_path = '/home/macan/ml/data/chinese_L-12_H-768_A-12'
     root_path = '/home/macan/ml/workspace/BERT_Base2'
 
-flags = tf.flags
+flags = tf.compat.v1.flags
 FLAGS = flags.FLAGS
 
 ## Required parameters
-flags.DEFINE_string("data_dir",  os.path.join(os.path.join(root_path, 'data'), 'classification'),
+flags.DEFINE_string("data_dir", os.path.join(os.path.join(root_path, 'data'), 'classification'),
                     "The input data dir. Should contain the .tsv files (or other data files) for the task.")
 
 flags.DEFINE_string(
@@ -97,7 +97,7 @@ flags.DEFINE_float(
     "Proportion of training to perform linear learning rate warmup for. "
     "E.g., 0.1 = 10% of training.")
 
-flags.DEFINE_integer("save_checkpoints_steps",500,
+flags.DEFINE_integer("save_checkpoints_steps", 500,
                      "How often to save the model checkpoint.")
 
 flags.DEFINE_integer("iterations_per_loop", 1000,
@@ -107,16 +107,19 @@ flags.DEFINE_integer('save_summary_steps', 500, 'summary steps')
 
 # logger = get_logger(os.path.join(FLAGS.output_dir, 'c.log'))
 import logging
-logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class RestoreHook(tf.train.SessionRunHook):
+
+class RestoreHook(tf.compat.v1.train.SessionRunHook):
     def __init__(self, init_fn):
         self.init_fn = init_fn
 
     def after_create_session(self, session, coord=None):
-        if session.run(tf.train.get_or_create_global_step()) == 0:
+        if session.run(tf.compat.v1.train.get_or_create_global_step()) == 0:
             self.init_fn(session)
+
 
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -195,7 +198,7 @@ class ThuProcessor(DataProcessor):
             self._read_tsv(os.path.join(data_dir, "train.txt")), 'train')
 
     def get_dev_examples(self, data_dir):
-       return self._create_examples(
+        return self._create_examples(
             self._read_tsv(os.path.join(data_dir, "dev.txt")), 'dev')
 
     def get_test_examples(self, data_dir):
@@ -218,7 +221,7 @@ class ThuProcessor(DataProcessor):
         examples = []
         np.random.shuffle(lines)
         for i, line in enumerate(lines):
-            guid = '%s-%s' %(set_type, i)
+            guid = '%s-%s' % (set_type, i)
             # if set_type == 'test':
             #     text_a = tokenization.convert_to_unicode(line[1])
             #     label = '0'
@@ -233,6 +236,7 @@ class ThuProcessor(DataProcessor):
                 InputExample(guid=guid, text_a=text_a, label=label, text_b=None)
             )
         return examples
+
 
 def conver_single_example(ex_index, example, label_list, max_seq_length, tokenizer, mode):
     """
@@ -259,7 +263,7 @@ def conver_single_example(ex_index, example, label_list, max_seq_length, tokeniz
 
     # 截断，因为有句首和句尾的标识符
     if len(tokens_a) > max_seq_length - 2:
-        tokens_a = tokens_a[0:(max_seq_length-2)]
+        tokens_a = tokens_a[0:(max_seq_length - 2)]
 
     tokens = []
     segment_ids = []
@@ -270,11 +274,11 @@ def conver_single_example(ex_index, example, label_list, max_seq_length, tokeniz
         segment_ids.append(0)
     tokens.append('[SEP]')
     segment_ids.append(0)
-    #将字符转化为id形式
+    # 将字符转化为id形式
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
-    input_mask = [1]*len(input_ids)
-    #补全到max_seg_length
+    input_mask = [1] * len(input_ids)
+    # 补全到max_seg_length
     while len(input_ids) < max_seq_length:
         input_ids.append(0)
         segment_ids.append(0)
@@ -283,18 +287,19 @@ def conver_single_example(ex_index, example, label_list, max_seq_length, tokeniz
         label_id = -1
     else:
         label_id = label_map[example.label]
-    if ex_index < 2 and mode in ['train', 'dev']:
-        logger.info("*** Example ***")
-        logger.info("guid: %s" % (example.guid))
-        logger.info("tokens: %s" % " ".join(
-            [tokenization.printable_text(x) for x in tokens]))
-        logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        logger.info("label: %s (id = %d)" % (example.label, label_id))
+    # if ex_index < 2 and mode in ['train', 'dev']:
+    #     logger.info("*** Example ***")
+    #     logger.info("guid: %s" % (example.guid))
+    #     logger.info("tokens: %s" % " ".join(
+    #         [tokenization.printable_text(x) for x in tokens]))
+    #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+    #     logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+    #     logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+    #     logger.info("label: %s (id = %d)" % (example.label, label_id))
 
     feature = InputFeatures(input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids, label_id=label_id)
     return feature
+
 
 def file_based_convert_examples_to_features(examples, label_list, max_seq_length, tokenizer, output_file, mode):
     """
@@ -310,12 +315,14 @@ def file_based_convert_examples_to_features(examples, label_list, max_seq_length
     # 将每一个样本转化为idx特征，封装到map中后进行序列化存储为record
     for ex_index, example in enumerate(examples):
         if ex_index % 10000 == 0:
-            logger.info('Writing example %d of %d' %(ex_index, len(examples)))
+            logger.info('Writing example %d of %d' % (ex_index, len(examples)))
         feature = conver_single_example(ex_index, example, label_list, max_seq_length, tokenizer, mode)
+
         # 将输入数据转化为64位int 的list，这是必须的
         def create_int_feature(values):
             f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
             return f
+
         features = collections.OrderedDict()
         features['input_ids'] = create_int_feature(feature.input_ids)
         features['input_mask'] = create_int_feature(feature.input_mask)
@@ -324,6 +331,7 @@ def file_based_convert_examples_to_features(examples, label_list, max_seq_length
         # 转化为Example 协议内存块
         tf_example = tf.train.Example(features=tf.train.Features(feature=features))
         writer.write(tf_example.SerializeToString())
+
 
 def file_based_input_fn_builder(input_file, seq_length, num_label, is_training, drop_remainder):
     """
@@ -335,10 +343,10 @@ def file_based_input_fn_builder(input_file, seq_length, num_label, is_training, 
     :return:
     """
     name_to_features = {
-      "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
-      "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
-      "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
-      "label_ids": tf.FixedLenFeature([], tf.int64),
+        "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
+        "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
+        "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
+        "label_ids": tf.FixedLenFeature([], tf.int64),
     }
 
     def _decode_record(record, name_to_feature):
@@ -347,7 +355,8 @@ def file_based_input_fn_builder(input_file, seq_length, num_label, is_training, 
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
-                t = tf.to_int32(t)
+                # t = tf.to_int32(t)
+                tf.cast(tf.int32, t)
             example[name] = t
         return example
 
@@ -372,6 +381,7 @@ def file_based_input_fn_builder(input_file, seq_length, num_label, is_training, 
         # d = d.apply(lambda record: _decode_record(record, name_to_features))
         # d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
         return d
+
     return input_fn
 
 
@@ -413,14 +423,14 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids, l
     #                                l2_reg_lambda=0.001)
     # loss, predictions, probabilities = model.add_cnn_layer()
 
-    output_weights = tf.get_variable(
+    output_weights = tf.compat.v1.get_variable(
         "output_weights", [num_labels, hidden_size],
-        initializer=tf.truncated_normal_initializer(stddev=0.02))
+        initializer=tf.compat.v1.truncated_normal_initializer(stddev=0.02))
 
-    output_bias = tf.get_variable(
+    output_bias = tf.compat.v1.get_variable(
         "output_bias", [num_labels], initializer=tf.zeros_initializer())
 
-    with tf.variable_scope("loss"):
+    with tf.compat.v1.variable_scope("loss"):
         if is_training:
             # I.e., 0.1 dropout
             output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
@@ -436,6 +446,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids, l
         loss = tf.reduce_mean(per_example_loss)
     return (loss, per_example_loss, logits, probabilities)
 
+
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate, num_train_steps,
                      num_warmup_steps):
     """
@@ -449,6 +460,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate, nu
     :param use_one_hot_embeddings:
     :return:
     """
+
     def model_fn(features, labels, mode, params):
         logger.info("*** Features ***")
         for name in sorted(features.keys()):
@@ -473,11 +485,11 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate, nu
             (assignment_map, initialized_variable_names) = \
                 modeling.get_assignment_map_from_checkpoint(tvars, init_checkpoint)
             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
-            #variables_to_restore = tf.contrib.framework.get_model_variables()
-            #init_fn = tf.contrib.framework.\
-               # assign_from_checkpoint_fn(init_checkpoint,
-                #                          variables_to_restore,
-                 #                         ignore_missing_vars=True)
+            # variables_to_restore = tf.contrib.framework.get_model_variables()
+            # init_fn = tf.contrib.framework.\
+            # assign_from_checkpoint_fn(init_checkpoint,
+            #                          variables_to_restore,
+            #                         ignore_missing_vars=True)
 
         # 打印变量名称
         logger.info("**** Trainable Variables ****")
@@ -486,9 +498,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate, nu
             if var.name in initialized_variable_names:
                 init_string = ", *INIT_FROM_CKPT*"
             logger.info("  name = %s, shape = %s%s", var.name, var.shape,
-                            init_string)
-
-
+                        init_string)
 
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
@@ -509,18 +519,21 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate, nu
                     "eval_accuracy": accuracy,
                     "eval_loss": loss,
                 }
+
             eval_metrics = metric_fn(per_example_loss, label_ids, logits)
             output_spec = tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=total_loss,
                 eval_metric_ops=eval_metrics
-                #evaluation_hooks=[RestoreHook(init_fn)]
-                )
+                # evaluation_hooks=[RestoreHook(init_fn)]
+            )
         else:
             output_spec = tf.estimator.EstimatorSpec(
                 mode=mode, predictions=probabilities)
         return output_spec
+
     return model_fn
+
 
 def main(_):
     if not FLAGS.do_train and not FLAGS.do_eval and not FLAGS.do_predict:
@@ -539,7 +552,7 @@ def main(_):
         os.makedirs(FLAGS.output_dir)
 
     processor = ThuProcessor()
-    #定义分词器
+    # 定义分词器
     tokenizer = tokenization.FullTokenizer(
         vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
     # estimator 运行参数
@@ -550,7 +563,7 @@ def main(_):
         keep_checkpoint_max=5,
         log_step_count_steps=500,
         session_config=tf.ConfigProto(log_device_placement=True)
-        #session_config=tf.ConfigProto(log_device_placement=True,
+        # session_config=tf.ConfigProto(log_device_placement=True,
         #                               device_count={'GPU': 1}))
     )
 
@@ -668,8 +681,3 @@ if __name__ == "__main__":
     # flags.mark_flag_as_required("output_dir")
     tf.app.run()
     # load_data()
-
-
-
-
-

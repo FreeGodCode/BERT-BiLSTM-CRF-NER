@@ -24,7 +24,7 @@ def start_server():
     server.join()
 
 
-def train_ner():
+def train_pre():
     import os
     from bert_base.train.train_helper import get_args_parser
     from bert_base.train.bert_lstm_ner import train
@@ -43,5 +43,5 @@ if __name__ == '__main__':
     """
     如果想训练，那么直接 指定参数跑，如果想启动服务，那么注释掉train,打开server即可
     """
-    train_ner()
+    train_pre()
     #start_server()

@@ -6,8 +6,8 @@ bert-blstm-crf layer
 """
 
 import tensorflow as tf
-from tensorflow.contrib import rnn
 from tensorflow.contrib import crf
+from tensorflow.contrib import rnn
 
 
 class BLSTM_CRF(object):
@@ -91,7 +91,7 @@ class BLSTM_CRF(object):
 
         :return:
         """
-        with tf.variable_scope('rnn_layer'):
+        with tf.compat.v1.variable_scope('rnn_layer'):
             cell_fw, cell_bw = self._bi_dir_rnn()
             if self.num_layers > 1:
                 cell_fw = rnn.MultiRNNCell([cell_fw] * self.num_layers, state_is_tuple=True)
@@ -108,23 +108,23 @@ class BLSTM_CRF(object):
         :param lstm_outputs: [batch_size, num_steps, emb_size]
         :return: [batch_size, num_steps, num_tags]
         """
-        with tf.variable_scope("project" if not name else name):
-            with tf.variable_scope("hidden"):
-                W = tf.get_variable("W", shape=[self.hidden_unit * 2, self.hidden_unit],
-                                    dtype=tf.float32, initializer=self.initializers.xavier_initializer())
+        with tf.compat.v1.variable_scope("project" if not name else name):
+            with tf.compat.v1.variable_scope("hidden"):
+                W = tf.compat.v1.get_variable("W", shape=[self.hidden_unit * 2, self.hidden_unit],
+                                              dtype=tf.float32, initializer=self.initializers.xavier_initializer())
 
-                b = tf.get_variable("b", shape=[self.hidden_unit], dtype=tf.float32,
-                                    initializer=tf.zeros_initializer())
+                b = tf.compat.v1.get_variable("b", shape=[self.hidden_unit], dtype=tf.float32,
+                                              initializer=tf.zeros_initializer())
                 output = tf.reshape(lstm_outputs, shape=[-1, self.hidden_unit * 2])
                 hidden = tf.nn.xw_plus_b(output, W, b)
 
             # project to score of tags
-            with tf.variable_scope("logits"):
-                W = tf.get_variable("W", shape=[self.hidden_unit, self.num_labels],
-                                    dtype=tf.float32, initializer=self.initializers.xavier_initializer())
+            with tf.compat.v1.variable_scope("logits"):
+                W = tf.compat.v1.get_variable("W", shape=[self.hidden_unit, self.num_labels],
+                                              dtype=tf.float32, initializer=self.initializers.xavier_initializer())
 
-                b = tf.get_variable("b", shape=[self.num_labels], dtype=tf.float32,
-                                    initializer=tf.zeros_initializer())
+                b = tf.compat.v1.get_variable("b", shape=[self.num_labels], dtype=tf.float32,
+                                              initializer=tf.zeros_initializer())
 
                 pred = tf.nn.xw_plus_b(hidden, W, b)
             return tf.reshape(pred, [-1, self.seq_length, self.num_labels])
@@ -135,13 +135,13 @@ class BLSTM_CRF(object):
         :param lstm_outputs: [batch_size, num_steps, emb_size]
         :return: [batch_size, num_steps, num_tags]
         """
-        with tf.variable_scope("project" if not name else name):
-            with tf.variable_scope("logits"):
-                W = tf.get_variable("W", shape=[self.embedding_dims, self.num_labels],
-                                    dtype=tf.float32, initializer=self.initializers.xavier_initializer())
+        with tf.compat.v1.variable_scope("project" if not name else name):
+            with tf.compat.v1.variable_scope("logits"):
+                W = tf.compat.v1.get_variable("W", shape=[self.embedding_dims, self.num_labels],
+                                              dtype=tf.float32, initializer=self.initializers.xavier_initializer())
 
-                b = tf.get_variable("b", shape=[self.num_labels], dtype=tf.float32,
-                                    initializer=tf.zeros_initializer())
+                b = tf.compat.v1.get_variable("b", shape=[self.num_labels], dtype=tf.float32,
+                                              initializer=tf.zeros_initializer())
                 output = tf.reshape(self.embedded_chars,
                                     shape=[-1, self.embedding_dims])  # [batch_size, embedding_dims]
                 pred = tf.tanh(tf.nn.xw_plus_b(output, W, b))
@@ -153,8 +153,8 @@ class BLSTM_CRF(object):
         :param project_logits: [1, num_steps, num_tags]
         :return: scalar loss
         """
-        with tf.variable_scope("crf_loss"):
-            trans = tf.get_variable(
+        with tf.compat.v1.variable_scope("crf_loss"):
+            trans = tf.compat.v1.get_variable(
                 "transitions",
                 shape=[self.num_labels, self.num_labels],
                 initializer=self.initializers.xavier_initializer())
